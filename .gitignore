@@ -1,0 +1,13 @@
+.env
+*.pt
+*.pth
+swachh_env/
+node_modules/
+__pycache__/
+*.pyc
+swachh-ai Frontend/dist/
+swachh-ai Frontend/node_modules/
+training_runs/
+dataset/
+YOLO-Waste-Detection-1/
+*.zip

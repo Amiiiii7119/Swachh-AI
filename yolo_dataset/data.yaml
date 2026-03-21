@@ -1,0 +1,11 @@
+path: /home/ami/yolo_dataset
+
+train: train/images
+val: val/images
+
+nc: 4
+names:
+  - food_waste
+  - metal
+  - paper
+  - plastic
