@@ -1,23 +1,27 @@
-FROM python:3.11-slim
+# Hugging Face Spaces compatible Dockerfile
+FROM python:3.10-slim
+
+# Create non-root user (required by HF Spaces)
+RUN useradd -m -u 1000 user
+USER user
+ENV PATH="/home/user/.local/bin:$PATH"
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    libgl1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    && rm -rf /var/lib/apt/lists/*
+# Install dependencies
+COPY --chown=user requirements.txt .
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy app code
+COPY --chown=user . .
 
-# Copy everything
-COPY . .
+# Use /tmp for all writes (HF Spaces restriction)
+ENV TMPDIR=/tmp
+ENV HF_HOME=/tmp/huggingface
+ENV TORCH_HOME=/tmp/torch
 
-ENV PYTHONPATH=/app
+# Expose port 7860 (required by HF Spaces)
+EXPOSE 7860
 
-EXPOSE 8000
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start FastAPI on port 7860
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
