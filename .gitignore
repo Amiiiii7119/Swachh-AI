@@ -1,6 +1,6 @@
 .env
-*.pt
-*.pth
+
+h
 swachh_env/
 node_modules/
 __pycache__/
