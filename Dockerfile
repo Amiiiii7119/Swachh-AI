@@ -1,30 +1,34 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
+
+# Install system dependencies and clean up in one layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgl1 \
+        libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user (required by HF Spaces)
+RUN useradd -m -u 1000 user
+USER user
+ENV PATH="/home/user/.local/bin:$PATH"
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    libgl1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    && rm -rf /var/lib/apt/lists/*
+# Install dependencies — no cache, no build artifacts left behind
+COPY --chown=user requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip cache purge
 
-# CPU-only PyTorch — 200MB instead of 2GB
-RUN pip install --no-cache-dir \
-    torch==2.1.0+cpu \
-    torchvision==0.16.0+cpu \
-    --extra-index-url https://download.pytorch.org/whl/cpu
+# Copy app code
+COPY --chown=user . .
 
-# All other dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Use /tmp for all writes (HF Spaces restriction)
+ENV TMPDIR=/tmp
+ENV HF_HOME=/tmp/huggingface
+ENV TORCH_HOME=/tmp/torch
 
-COPY . .
+# Expose port 7860 (required by HF Spaces)
+EXPOSE 7860
 
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-
-EXPOSE 8000
-
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Start FastAPI on port 7860
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]

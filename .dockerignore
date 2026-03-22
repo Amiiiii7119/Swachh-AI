@@ -1,16 +1,52 @@
+# Model weights — downloaded at runtime from HuggingFace
 *.pt
 *.pth
+*.onnx
+*.engine
+*.weights
+
+# Virtual environments
 swachh_env/
+venv/
+.venv/
+env/
+
+# Frontend
 node_modules/
 swachh-ai Frontend/node_modules/
 swachh-ai Frontend/dist/
+
+# Training data and runs
 training_runs/
 dataset/
 YOLO-Waste-Detection-1/
-__pycache__/
-*.pyc
-.env
-.git
-*.zip
 runs/
 yolo_dataset/
+train.py
+train_v2.py
+fix_yaml.py
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Secrets and local config
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Archives
+*.zip
+*.tar.gz
+*.tar
+
+# Misc
+*.log
+.DS_Store
