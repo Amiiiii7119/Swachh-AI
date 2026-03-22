@@ -32,4 +32,4 @@ requests
 pyyaml
 orjson
 matplotlib
-redis
+redishuggingface_hub

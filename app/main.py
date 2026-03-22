@@ -22,7 +22,7 @@ from app.api.endpoints import (
     health,
     dispatch,
 )
-from app.api.endpoints import advanced   # ← NEW
+from app.api.endpoints import advanced
 from app.services.bin_simulator import simulate_bin_fill
 from app.services.seeder import seed_initial_data
 from app.db.session import AsyncSessionLocal
@@ -31,7 +31,10 @@ try:
     from app.utils.logging import setup_logging
     setup_logging(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
 except ImportError:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +74,7 @@ app.include_router(leaderboard.router, prefix="/api", tags=["Leaderboard"])
 app.include_router(impact.router,      prefix="/api", tags=["Impact"])
 app.include_router(health.router,      prefix="/api", tags=["Health"])
 app.include_router(dispatch.router,    prefix="/api", tags=["Dispatch"])
-app.include_router(advanced.router,    prefix="/api", tags=["Advanced"])   # ← NEW
+app.include_router(advanced.router,    prefix="/api", tags=["Advanced"])
 
 _pipeline_started = False
 
@@ -80,21 +83,38 @@ _pipeline_started = False
 async def startup_event():
     global _pipeline_started
 
-    from app.db.base import Base
-    from app.db.session import engine
+    logger.info("=== Swachh AI v7.0 Starting ===")
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # ── Download YOLO models from HuggingFace if not present ─────────────────
+    try:
+        from app.utils.model_downloader import download_models
+        download_models()
+        logger.info("Models ready")
+    except Exception as e:
+        logger.error(f"Model download failed: {e}")
 
-    logger.info("Database tables ensured")
+    # ── Database ──────────────────────────────────────────────────────────────
+    try:
+        from app.db.base import Base
+        from app.db.session import engine
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables ensured")
+    except Exception as e:
+        logger.error(f"Database setup failed: {e}")
 
-    async with AsyncSessionLocal() as db:
-        await seed_initial_data(db)
+    # ── Seeder ────────────────────────────────────────────────────────────────
+    try:
+        async with AsyncSessionLocal() as db:
+            await seed_initial_data(db)
+        logger.info("Seeder OK")
+    except Exception as e:
+        logger.error(f"Seeder failed: {e}")
 
+    # ── Pathway Pipeline ──────────────────────────────────────────────────────
     if not _pipeline_started:
         try:
             from app.pathway_pipeline.pipeline import start
-            # Pass current event loop so pipeline can broadcast WebSocket updates
             loop = asyncio.get_event_loop()
             start(ws_loop=loop)
             _pipeline_started = True
@@ -102,7 +122,14 @@ async def startup_event():
         except Exception as e:
             logger.error(f"Pipeline start failed: {e}")
 
-    asyncio.create_task(simulate_bin_fill())
+    # ── Bin Simulator ─────────────────────────────────────────────────────────
+    try:
+        asyncio.create_task(simulate_bin_fill())
+        logger.info("Bin simulator started")
+    except Exception as e:
+        logger.error(f"Bin simulator failed: {e}")
+
+    logger.info("=== Swachh AI Ready ===")
 
 
 @app.on_event("shutdown")
@@ -126,6 +153,9 @@ async def pipeline_status():
         "impact_has_data":    bool(imp and imp.get("co2_saved_kg", 0) > 0),
         "websocket_clients":  ws_manager.client_count,
         "simulation_mode":    dash.get("simulation_mode", "normal"),
-        "dashboard_sample":   {k: dash.get(k) for k in ["total_waste_kg", "co2_saved_kg", "critical_bins"]},
-        "version":            "7.0.0",
+        "dashboard_sample":   {
+            k: dash.get(k)
+            for k in ["total_waste_kg", "co2_saved_kg", "critical_bins"]
+        },
+        "version": "7.0.0",
     }
