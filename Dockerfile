@@ -1,27 +1,30 @@
-# Hugging Face Spaces compatible Dockerfile
-FROM python:3.10-slim
-
-# Create non-root user (required by HF Spaces)
-RUN useradd -m -u 1000 user
-USER user
-ENV PATH="/home/user/.local/bin:$PATH"
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY --chown=user requirements.txt .
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
+RUN apt-get update && apt-get install -y \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy app code
-COPY --chown=user . .
+# CPU-only PyTorch — 200MB instead of 2GB
+RUN pip install --no-cache-dir \
+    torch==2.1.0+cpu \
+    torchvision==0.16.0+cpu \
+    --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Use /tmp for all writes (HF Spaces restriction)
-ENV TMPDIR=/tmp
-ENV HF_HOME=/tmp/huggingface
-ENV TORCH_HOME=/tmp/torch
+# All other dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose port 7860 (required by HF Spaces)
-EXPOSE 7860
+COPY . .
 
-# Start FastAPI on port 7860
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 8000
+
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
